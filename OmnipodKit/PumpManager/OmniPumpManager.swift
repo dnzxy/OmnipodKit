@@ -101,6 +101,32 @@ public class OmniPumpManager: RileyLinkPumpManager {
 
     static let podAlarmNotificationIdentifier = "Omni:\(LoopNotificationCategory.pumpFault.rawValue)"
 
+    static let lowRLBatteryAlertIdentifier: Alert.AlertIdentifier = "lowRLBattery"
+    static let lowRLBatteryInterruptionLevel: Alert.InterruptionLevel = .timeSensitive
+    static var lowRLBatteryAlertTitle: String {
+        LocalizedString("Low RileyLink Battery", comment: "Title for RileyLink low battery alert")
+    }
+
+    static func podFaultInterruptionLevel(_ faultEventCode: FaultEventCode) -> Alert.InterruptionLevel {
+        faultEventCode.faultType == .exceededMaximumPodLife80Hrs ? .timeSensitive : .critical
+    }
+
+    // Representative pod faults; the issued identifier is FaultEventCode.description under podAlarmNotificationIdentifier.
+    static let issuableFaultEventCodes: [FaultEventCode] = [
+        FaultEventCode(rawValue: FaultEventCode.FaultEventType.occluded.rawValue),
+        FaultEventCode(rawValue: FaultEventCode.FaultEventType.reservoirEmpty.rawValue),
+        FaultEventCode(rawValue: FaultEventCode.FaultEventType.exceededMaximumPodLife80Hrs.rawValue),
+        FaultEventCode(rawValue: FaultEventCode.FaultEventType.badTickHigh.rawValue)
+    ]
+
+    public static var issuableAlerts: [IssuableAlert] {
+        PumpManagerAlert.issuable.flatMap(\.issuableAlerts)
+            + [IssuableAlert(identifier: lowRLBatteryAlertIdentifier, interruptionLevel: lowRLBatteryInterruptionLevel, title: lowRLBatteryAlertTitle)]
+            + issuableFaultEventCodes.map {
+                IssuableAlert(identifier: $0.description, interruptionLevel: podFaultInterruptionLevel($0), title: $0.notificationTitle)
+            }
+    }
+
     private lazy var cancellables = Set<AnyCancellable>()
 
     private var rileylinkConnected: Bool = false
@@ -542,10 +568,10 @@ public class OmniPumpManager: RileyLinkPumpManager {
                 state.lastRileyLinkBatteryAlertDate = Date()
             }
             Task {
-                let identifier = Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: "lowRLBattery")
+                let identifier = Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: Self.lowRLBatteryAlertIdentifier)
                 let alertBody = String(format: LocalizedString("\"%1$@\" has a low battery", comment: "Format string for low battery alert body for RileyLink. (1: device name)"), device.name ?? "unnamed")
-                let content = Alert.Content(title: LocalizedString("Low RileyLink Battery", comment: "Title for RileyLink low battery alert"), body: alertBody, acknowledgeActionButtonLabel: LocalizedString("OK", comment: "Acknowledge button label for RileyLink low battery alert"))
-                await self.pumpDelegate.delegate?.issueAlert(Alert(identifier: identifier, foregroundContent: content, backgroundContent: content, trigger: .immediate))
+                let content = Alert.Content(title: Self.lowRLBatteryAlertTitle, body: alertBody, acknowledgeActionButtonLabel: LocalizedString("OK", comment: "Acknowledge button label for RileyLink low battery alert"))
+                await self.pumpDelegate.delegate?.issueAlert(Alert(identifier: identifier, foregroundContent: content, backgroundContent: content, trigger: .immediate, interruptionLevel: Self.lowRLBatteryInterruptionLevel))
             }
         }
     }
@@ -3203,7 +3229,7 @@ extension OmniPumpManager: PumpManager {
 
     func issueAlert(alert: PumpManagerAlert) {
         let identifier = Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: alert.alertIdentifier)
-        let loopAlert = Alert(identifier: identifier, foregroundContent: alert.foregroundContent, backgroundContent: alert.backgroundContent, trigger: .immediate)
+        let loopAlert = Alert(identifier: identifier, foregroundContent: alert.foregroundContent, backgroundContent: alert.backgroundContent, trigger: .immediate, interruptionLevel: alert.interruptionLevel)
         Task {
             await self.pumpDelegate.delegate?.issueAlert(loopAlert)
         }
@@ -3211,7 +3237,7 @@ extension OmniPumpManager: PumpManager {
         if let repeatInterval = alert.repeatInterval {
             // Schedule an additional repeating 15 minute reminder for suspend period ended.
             let repeatingIdentifier = Alert.Identifier(managerIdentifier: self.pluginIdentifier, alertIdentifier: alert.repeatingAlertIdentifier)
-            let loopAlert = Alert(identifier: repeatingIdentifier, foregroundContent: alert.foregroundContent, backgroundContent: alert.backgroundContent, trigger: .repeating(repeatInterval: repeatInterval))
+            let loopAlert = Alert(identifier: repeatingIdentifier, foregroundContent: alert.foregroundContent, backgroundContent: alert.backgroundContent, trigger: .repeating(repeatInterval: repeatInterval), interruptionLevel: alert.interruptionLevel)
             Task {
                 await self.pumpDelegate.delegate?.issueAlert(loopAlert)
             }
@@ -3390,7 +3416,8 @@ extension OmniPumpManager: PumpManager {
             await self.pumpDelegate.delegate?.issueAlert(Alert(identifier: Alert.Identifier(managerIdentifier: OmniPumpManager.podAlarmNotificationIdentifier,
                                                                     alertIdentifier: fault.faultEventCode.description),
                                        foregroundContent: content, backgroundContent: content,
-                                       trigger: .immediate))
+                                       trigger: .immediate,
+                                       interruptionLevel: Self.podFaultInterruptionLevel(fault.faultEventCode)))
         }
     }
 
