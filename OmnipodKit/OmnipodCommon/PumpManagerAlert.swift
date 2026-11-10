@@ -23,7 +23,7 @@ public enum PumpManagerAlert: Hashable {
     case timeOffsetChangeDetected
 
     // Every PumpManagerAlert OmniPumpManager issues; associated values don't affect identifier, level or title.
-    static let issuable: [PumpManagerAlert] = [
+    static let cataloged: [PumpManagerAlert] = [
         .userPodExpiration(triggeringSlot: nil, scheduledExpirationReminderOffset: 0),
         .podExpiring(triggeringSlot: nil),
         .podExpireImminent(triggeringSlot: nil),
@@ -48,9 +48,9 @@ public enum PumpManagerAlert: Hashable {
         }
     }
 
-    var issuableAlerts: [IssuableAlert] {
+    var catalogEntries: [AlertCatalogEntry] {
         let identifiers = isRepeating ? [alertIdentifier, repeatingAlertIdentifier] : [alertIdentifier]
-        return identifiers.map { IssuableAlert(identifier: $0, interruptionLevel: interruptionLevel, title: contentTitle) }
+        return identifiers.map { AlertCatalogEntry(identifier: $0, interruptionLevel: interruptionLevel, title: contentTitle) }
     }
 
     var repeatInterval: TimeInterval? {

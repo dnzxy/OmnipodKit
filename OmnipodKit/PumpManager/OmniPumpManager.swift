@@ -112,18 +112,18 @@ public class OmniPumpManager: RileyLinkPumpManager {
     }
 
     // Representative pod faults; the issued identifier is FaultEventCode.description under podAlarmNotificationIdentifier.
-    static let issuableFaultEventCodes: [FaultEventCode] = [
+    static let catalogedFaultEventCodes: [FaultEventCode] = [
         FaultEventCode(rawValue: FaultEventCode.FaultEventType.occluded.rawValue),
         FaultEventCode(rawValue: FaultEventCode.FaultEventType.reservoirEmpty.rawValue),
         FaultEventCode(rawValue: FaultEventCode.FaultEventType.exceededMaximumPodLife80Hrs.rawValue),
         FaultEventCode(rawValue: FaultEventCode.FaultEventType.badTickHigh.rawValue)
     ]
 
-    public static var issuableAlerts: [IssuableAlert] {
-        PumpManagerAlert.issuable.flatMap(\.issuableAlerts)
-            + [IssuableAlert(identifier: lowRLBatteryAlertIdentifier, interruptionLevel: lowRLBatteryInterruptionLevel, title: lowRLBatteryAlertTitle)]
-            + issuableFaultEventCodes.map {
-                IssuableAlert(identifier: $0.description, interruptionLevel: podFaultInterruptionLevel($0), title: $0.notificationTitle)
+    public static var alertCatalog: [AlertCatalogEntry] {
+        PumpManagerAlert.cataloged.flatMap(\.catalogEntries)
+            + [AlertCatalogEntry(identifier: lowRLBatteryAlertIdentifier, interruptionLevel: lowRLBatteryInterruptionLevel, title: lowRLBatteryAlertTitle)]
+            + catalogedFaultEventCodes.map {
+                AlertCatalogEntry(identifier: $0.description, interruptionLevel: podFaultInterruptionLevel($0), title: $0.notificationTitle)
             }
     }
 
